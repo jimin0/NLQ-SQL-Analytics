@@ -7,7 +7,7 @@ def render_sidebar():
         st.image("https://placehold.co/100x100.png", width=50)
         selected = option_menu(
             menu_title=None,
-            options=["홈", "내 브리핑", "마이페이지", "직원", "물류"],
+            options=["홈", "내 브리핑", "마이페이지", "설정", "도움말"],
             icons=["house", "person", "people", "search", "book"],
             menu_icon="cast",
             default_index=0,
