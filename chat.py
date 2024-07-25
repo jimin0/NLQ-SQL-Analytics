@@ -12,7 +12,6 @@ logging.langsmith("wiset-project")
 # 데이터베이스 연결
 db = get_database()
 
-
 # LLM 생성
 llm = ChatOpenAI(
     model=MODEL_NAME, temperature=0, streaming=True, api_key=OPENAI_API_KEY
@@ -31,49 +30,80 @@ def get_query_response(query):
 
 
 def render_chat_section():
-    st.subheader("데이터베이스 질의")
-    col1, col2 = st.columns([4, 1])
+    st.title("🤖 Northwind Chat")
+
+    # 세션 상태에 메시지 기록 초기화
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+    # 채팅 기록을 표시할 컨테이너
+    chat_container = st.container()
+
+    # 사용자 입력
+    with st.form(key="chat_form"):
+        col1, col2 = st.columns([9, 1])
+        with col1:
+            user_input = st.text_input(
+                "",
+                key="user_input",
+                placeholder="예: 고객 중 가장 구매를 많이 한 top 10명과 각각의 구매액은?",
+            )
+        with col2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            submit_button = st.form_submit_button("전송")
+        st.markdown("</div>", unsafe_allow_html=True)
+
+    # 추천 질문 버튼
+    st.subheader("추천 질문")
+    col1, col2, col3 = st.columns(3)
     with col1:
-        user_input = st.text_input(
-            "",
-            placeholder="예: 고객 중 가장 구매를 많이 한 top 10명과 각각의 구매액은?",
-        )
+        if st.button("최근 한 달간 가장 많이 팔린 제품은?"):
+            user_input = "최근 한 달간 가장 많이 팔린 제품은?"
+            submit_button = True
     with col2:
-        st.markdown("<br>", unsafe_allow_html=True)
-        query_button = st.button("질문하기", key="query_button")
-    st.markdown("</div>", unsafe_allow_html=True)
+        if st.button("각 직원별 총 판매액은?"):
+            user_input = "각 직원별 총 판매액은?"
+            submit_button = True
+    with col3:
+        if st.button("가장 많은 주문을 한 고객의 정보는?"):
+            user_input = "가장 많은 주문을 한 고객의 정보는?"
+            submit_button = True
 
-    if query_button:
-        if user_input:
-            with st.spinner("응답을 생성 중입니다..."):
-                response = get_query_response(user_input)
-                st.write(response)
+    # 사용자 입력 처리
+    if submit_button and user_input:
+        # 사용자 메시지 추가
+        st.session_state.messages.append({"role": "user", "content": user_input})
 
-                # 결과가 테이블 형태라면 DataFrame으로 변환하여 표시
-                if isinstance(response, str) and response.strip().startswith("|"):
+        # 챗봇 응답 생성
+        with st.spinner("응답을 생성 중입니다..."):
+            response = get_query_response(user_input)
+            st.session_state.messages.append({"role": "assistant", "content": response})
+
+    # 채팅 기록 표시 (최근 4개 메시지만)
+    with chat_container:
+        for message in st.session_state.messages[-4:]:
+            with st.chat_message(message["role"]):
+                st.markdown(message["content"])
+
+                # 테이블 형태의 응답 처리
+                if (
+                    message["role"] == "assistant"
+                    and isinstance(message["content"], str)
+                    and "|" in message["content"]
+                ):
                     try:
                         df = pd.read_csv(
-                            pd.compat.StringIO(response), sep="|", skipinitialspace=True
+                            pd.compat.StringIO(message["content"]),
+                            sep="|",
+                            skipinitialspace=True,
                         )
                         st.dataframe(df)
                     except:
                         st.text("결과를 표 형태로 표시할 수 없습니다.")
-        else:
-            st.warning("질문을 입력해주세요.")
 
-    # 추천 질문
-    st.subheader("추천 질문")
-    if st.button("최근 한 달간 가장 많이 팔린 제품은?"):
-        render_chat_section.query = "최근 한 달간 가장 많이 팔린 제품은?"
-        st.experimental_rerun()
-    if st.button("각 직원별 총 판매액은?"):
-        render_chat_section.query = "각 직원별 총 판매액은?"
-        st.experimental_rerun()
-    if st.button("가장 많은 주문을 한 고객의 정보는?"):
-        render_chat_section.query = "가장 많은 주문을 한 고객의 정보는?"
-        st.experimental_rerun()
+    # 스크롤을 최신 메시지로 이동
+    st.query_params.clear()
 
-    # 이전 질문이 있다면 자동으로 입력
-    if hasattr(render_chat_section, "query"):
-        user_input = render_chat_section.query
-        del render_chat_section.query
+
+if __name__ == "__main__":
+    render_chat_section()
