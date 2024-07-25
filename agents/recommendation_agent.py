@@ -1,11 +1,17 @@
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.chains import LLMChain
-from utils.config import MODEL_NAME, OPENAI_API_KEY
+from utils.config import MODEL_NAME, get_openai_api_key
 from utils.database import get_database
 
-# LLM 초기화
-llm = ChatOpenAI(model=MODEL_NAME, temperature=0.7, api_key=OPENAI_API_KEY)
+
+# LLM 초기화 함수
+def create_llm():
+    openai_api_key = get_openai_api_key()
+    if not openai_api_key:
+        raise ValueError("OpenAI API Key가 제공되지 않았습니다.")
+    return ChatOpenAI(model=MODEL_NAME, temperature=0.7, api_key=openai_api_key)
+
 
 # 데이터베이스 스키마 정보 가져오기
 db = get_database()
@@ -29,11 +35,11 @@ prompt_template = ChatPromptTemplate.from_template(
 """
 )
 
-# LLMChain 생성
-llm_chain = LLMChain(llm=llm, prompt=prompt_template)
-
 
 def get_recommended_questions(previous_question, previous_answer):
+    llm = create_llm()
+    llm_chain = LLMChain(llm=llm, prompt=prompt_template)
+
     # LLM을 사용하여 추천 질문 생성
     response = llm_chain.invoke(
         {

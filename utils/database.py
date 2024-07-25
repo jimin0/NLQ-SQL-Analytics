@@ -1,6 +1,9 @@
 from sqlalchemy import create_engine
 from langchain.sql_database import SQLDatabase
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 
 def get_database():
