@@ -5,6 +5,7 @@ import pandas as pd
 from config import MODEL_NAME, OPENAI_API_KEY
 from database import get_database
 from langchain_teddynote import logging
+from recommendation import get_recommended_questions
 
 # Langsmith 설정
 logging.langsmith("wiset-project")
@@ -32,9 +33,15 @@ def get_query_response(query):
 def render_chat_section():
     st.title("🤖 Northwind Chat")
 
-    # 세션 상태에 메시지 기록 초기화
+    # 세션 상태 초기화
     if "messages" not in st.session_state:
         st.session_state.messages = []
+    if "recommended_questions" not in st.session_state:
+        st.session_state.recommended_questions = [
+            "최근 한 달간 가장 많이 팔린 제품은?",
+            "각 직원별 총 판매액은?",
+            "가장 많은 주문을 한 고객의 정보는?",
+        ]
 
     # 채팅 기록을 표시할 컨테이너
     chat_container = st.container()
@@ -55,19 +62,27 @@ def render_chat_section():
 
     # 추천 질문 버튼
     st.subheader("추천 질문")
+    # col1, col2, col3 = st.columns(3)
+    # with col1:
+    #     if st.button("최근 한 달간 가장 많이 팔린 제품은?"):
+    #         user_input = "최근 한 달간 가장 많이 팔린 제품은?"
+    #         submit_button = True
+    # with col2:
+    #     if st.button("각 직원별 총 판매액은?"):
+    #         user_input = "각 직원별 총 판매액은?"
+    #         submit_button = True
+    # with col3:
+    #     if st.button("가장 많은 주문을 한 고객의 정보는?"):
+    #         user_input = "가장 많은 주문을 한 고객의 정보는?"
+    #         submit_button = True
+
     col1, col2, col3 = st.columns(3)
-    with col1:
-        if st.button("최근 한 달간 가장 많이 팔린 제품은?"):
-            user_input = "최근 한 달간 가장 많이 팔린 제품은?"
-            submit_button = True
-    with col2:
-        if st.button("각 직원별 총 판매액은?"):
-            user_input = "각 직원별 총 판매액은?"
-            submit_button = True
-    with col3:
-        if st.button("가장 많은 주문을 한 고객의 정보는?"):
-            user_input = "가장 많은 주문을 한 고객의 정보는?"
-            submit_button = True
+    for i, col in enumerate([col1, col2, col3]):
+        with col:
+            if i < len(st.session_state.recommended_questions):
+                if st.button(st.session_state.recommended_questions[i]):
+                    user_input = st.session_state.recommended_questions[i]
+                    submit_button = True
 
     # 사용자 입력 처리
     if submit_button and user_input:
@@ -78,6 +93,11 @@ def render_chat_section():
         with st.spinner("응답을 생성 중입니다..."):
             response = get_query_response(user_input)
             st.session_state.messages.append({"role": "assistant", "content": response})
+
+        # 추천 질문 업데이트
+        st.session_state.recommended_questions = get_recommended_questions(
+            user_input, response
+        )
 
     # 채팅 기록 표시 (최근 4개 메시지만)
     with chat_container:
