@@ -2,8 +2,9 @@ import streamlit as st
 import pandas as pd
 from agents.sql_agent import get_query_response
 from agents.recommendation_agent import get_recommended_questions
+from agents.router_agent import route_query
 from utils.config import init_langsmith, get_openai_api_key, is_valid_api_key
-
+from langchain.memory import ConversationBufferMemory
 
 # Langsmith 설정
 init_langsmith()
@@ -21,6 +22,8 @@ def render_chat_section():
             "각 직원별 총 판매액은?",
             "가장 많은 주문을 한 고객의 정보는?",
         ]
+    if "memory" not in st.session_state:
+        st.session_state.memory = ConversationBufferMemory(return_messages=True)
 
     # 채팅 기록을 표시할 컨테이너
     chat_container = st.container()
@@ -45,7 +48,9 @@ def render_chat_section():
     for i, col in enumerate([col1, col2, col3]):
         with col:
             if i < len(st.session_state.recommended_questions):
-                if st.button(st.session_state.recommended_questions[i]):
+                if st.button(
+                    st.session_state.recommended_questions[i], key=f"rec_q_{i}"
+                ):
                     user_input = st.session_state.recommended_questions[i]
                     submit_button = True
 
@@ -59,6 +64,7 @@ def render_chat_section():
 
 def process_user_input(user_input, chat_container):
     st.session_state.messages.append({"role": "user", "content": user_input})
+    st.session_state.memory.chat_memory.add_user_message(user_input)
 
     api_key = get_openai_api_key()
     if not api_key:
@@ -71,14 +77,37 @@ def process_user_input(user_input, chat_container):
 
     with st.spinner("응답을 생성 중입니다..."):
         try:
-            response = get_query_response(user_input)
+            # 메모리에서 대화 기록 가져오기
+            chat_history = st.session_state.memory.load_memory_variables({})["history"]
+
+            # 대화 기록을 포함한 컨텍스트 생성
+            context = f"대화 기록:\n{chat_history}\n\n사용자: {user_input}\n\n답변:"
+
+            query_type = route_query(context)
+            is_sql = query_type == "sql"
+
+            response = get_query_response(context, st.session_state.memory, is_sql)
             if response:
                 st.session_state.messages.append(
                     {"role": "assistant", "content": response}
                 )
-                st.session_state.recommended_questions = get_recommended_questions(
-                    user_input, response
+                st.session_state.memory.chat_memory.add_ai_message(response)
+
+                # 전체 대화 히스토리를 문자열로 변환
+                full_chat_history = "\n".join(
+                    [f"{m['role']}: {m['content']}" for m in st.session_state.messages]
                 )
+
+                # 새로운 추천 질문 생성
+                new_recommended_questions = get_recommended_questions(
+                    user_input, response, full_chat_history
+                )
+
+                # 세션 상태 업데이트
+                st.session_state.recommended_questions = new_recommended_questions
+
+                # 화면 새로고침
+                st.experimental_rerun()
             else:
                 st.warning("응답을 생성하지 못했습니다. 다른 질문을 시도해 보세요.")
         except Exception as e:
