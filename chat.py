@@ -2,7 +2,7 @@ import streamlit as st
 import pandas as pd
 from agents.sql_agent import get_query_response
 from agents.recommendation_agent import get_recommended_questions
-from utils.config import init_langsmith
+from utils.config import init_langsmith, get_openai_api_key, is_valid_api_key
 
 
 # Langsmith 설정
@@ -60,13 +60,36 @@ def render_chat_section():
 def process_user_input(user_input, chat_container):
     st.session_state.messages.append({"role": "user", "content": user_input})
 
-    with st.spinner("응답을 생성 중입니다..."):
-        response = get_query_response(user_input)
-        st.session_state.messages.append({"role": "assistant", "content": response})
+    api_key = get_openai_api_key()
+    if not api_key:
+        st.error("OpenAI API 키를 입력해주세요.")
+        return
 
-    st.session_state.recommended_questions = get_recommended_questions(
-        user_input, response
-    )
+    if not is_valid_api_key(api_key):
+        st.error("유효하지 않은 OpenAI API 키입니다. 올바른 API 키를 입력해주세요.")
+        return
+
+    with st.spinner("응답을 생성 중입니다..."):
+        try:
+            response = get_query_response(user_input)
+            if response:
+                st.session_state.messages.append(
+                    {"role": "assistant", "content": response}
+                )
+                st.session_state.recommended_questions = get_recommended_questions(
+                    user_input, response
+                )
+            else:
+                st.warning("응답을 생성하지 못했습니다. 다른 질문을 시도해 보세요.")
+        except Exception as e:
+            if "API 키가 제공되지 않았습니다" in str(e):
+                st.error("OpenAI API 키를 입력해주세요.")
+            elif "유효하지 않은 OpenAI API 키입니다" in str(e):
+                st.error(
+                    "유효하지 않은 OpenAI API 키입니다. 올바른 API 키를 입력해주세요."
+                )
+            else:
+                st.error(f"오류가 발생했습니다: {str(e)}")
 
 
 def display_chat_history(chat_container):

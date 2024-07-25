@@ -1,5 +1,6 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
+from utils.config import is_valid_api_key, get_openai_api_key
 
 
 def render_sidebar():
@@ -23,6 +24,7 @@ def render_sidebar():
                 "nav-link-selected": {"background-color": "#ff9900"},
             },
         )
+        st.session_state.selected_menu = selected
 
         st.markdown("---")
 
@@ -36,6 +38,18 @@ def render_sidebar():
             type="password",
             on_change=st.experimental_rerun,
         )
+        # API 키 유효성 확인 및 메시지 표시
+        if openai_api_key:
+            if is_valid_api_key(openai_api_key):
+                st.markdown(
+                    '<p style="color:green;">API 키가 유효합니다.</p>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    '<p style="color:red;">API 키가 유효하지 않습니다.</p>',
+                    unsafe_allow_html=True,
+                )
 
         st.markdown("---")
 
@@ -45,3 +59,5 @@ def render_sidebar():
         if clear_btn:
             st.session_state["messages"] = []
             st.experimental_rerun()
+
+    return selected
