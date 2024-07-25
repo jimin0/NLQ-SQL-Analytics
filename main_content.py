@@ -5,7 +5,7 @@ from content_card import render_content_section
 
 def render_main_content():
     st.markdown(
-        '<p class="big-font">옥돌민님, 안녕하세요. 오늘은 어떤 도움을 드릴까요?</p>',
+        '<p class="big-font">안녕하세요. 오늘은 어떤 도움을 드릴까요?</p>',
         unsafe_allow_html=True,
     )
     st.markdown(

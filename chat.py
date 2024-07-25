@@ -1,33 +1,12 @@
 import streamlit as st
-from langchain_community.agent_toolkits import create_sql_agent
-from langchain_openai import ChatOpenAI
 import pandas as pd
-from config import MODEL_NAME, OPENAI_API_KEY
-from database import get_database
-from langchain_teddynote import logging
-from recommendation import get_recommended_questions
+from agents.sql_agent import get_query_response
+from agents.recommendation_agent import get_recommended_questions
+from utils.config import init_langsmith
+
 
 # Langsmith 설정
-logging.langsmith("wiset-project")
-
-# 데이터베이스 연결
-db = get_database()
-
-# LLM 생성
-llm = ChatOpenAI(
-    model=MODEL_NAME, temperature=0, streaming=True, api_key=OPENAI_API_KEY
-)
-
-# SQL 에이전트 생성
-agent_executor = create_sql_agent(llm, db=db, agent_type="openai-tools", verbose=False)
-
-
-def get_query_response(query):
-    try:
-        response = agent_executor.invoke(query)["output"]
-        return response
-    except Exception as e:
-        return f"오류가 발생했습니다: {str(e)}"
+init_langsmith()
 
 
 def render_chat_section():
@@ -62,20 +41,6 @@ def render_chat_section():
 
     # 추천 질문 버튼
     st.subheader("추천 질문")
-    # col1, col2, col3 = st.columns(3)
-    # with col1:
-    #     if st.button("최근 한 달간 가장 많이 팔린 제품은?"):
-    #         user_input = "최근 한 달간 가장 많이 팔린 제품은?"
-    #         submit_button = True
-    # with col2:
-    #     if st.button("각 직원별 총 판매액은?"):
-    #         user_input = "각 직원별 총 판매액은?"
-    #         submit_button = True
-    # with col3:
-    #     if st.button("가장 많은 주문을 한 고객의 정보는?"):
-    #         user_input = "가장 많은 주문을 한 고객의 정보는?"
-    #         submit_button = True
-
     col1, col2, col3 = st.columns(3)
     for i, col in enumerate([col1, col2, col3]):
         with col:
@@ -86,43 +51,42 @@ def render_chat_section():
 
     # 사용자 입력 처리
     if submit_button and user_input:
-        # 사용자 메시지 추가
-        st.session_state.messages.append({"role": "user", "content": user_input})
+        process_user_input(user_input, chat_container)
 
-        # 챗봇 응답 생성
-        with st.spinner("응답을 생성 중입니다..."):
-            response = get_query_response(user_input)
-            st.session_state.messages.append({"role": "assistant", "content": response})
+    # 채팅 기록 표시
+    display_chat_history(chat_container)
 
-        # 추천 질문 업데이트
-        st.session_state.recommended_questions = get_recommended_questions(
-            user_input, response
-        )
 
-    # 채팅 기록 표시 (최근 4개 메시지만)
+def process_user_input(user_input, chat_container):
+    st.session_state.messages.append({"role": "user", "content": user_input})
+
+    with st.spinner("응답을 생성 중입니다..."):
+        response = get_query_response(user_input)
+        st.session_state.messages.append({"role": "assistant", "content": response})
+
+    st.session_state.recommended_questions = get_recommended_questions(
+        user_input, response
+    )
+
+
+def display_chat_history(chat_container):
     with chat_container:
         for message in st.session_state.messages[-4:]:
             with st.chat_message(message["role"]):
                 st.markdown(message["content"])
+                if message["role"] == "assistant":
+                    display_table_if_applicable(message["content"])
 
-                # 테이블 형태의 응답 처리
-                if (
-                    message["role"] == "assistant"
-                    and isinstance(message["content"], str)
-                    and "|" in message["content"]
-                ):
-                    try:
-                        df = pd.read_csv(
-                            pd.compat.StringIO(message["content"]),
-                            sep="|",
-                            skipinitialspace=True,
-                        )
-                        st.dataframe(df)
-                    except:
-                        st.text("결과를 표 형태로 표시할 수 없습니다.")
 
-    # 스크롤을 최신 메시지로 이동
-    st.query_params.clear()
+def display_table_if_applicable(content):
+    if isinstance(content, str) and "|" in content:
+        try:
+            df = pd.read_csv(
+                pd.compat.StringIO(content), sep="|", skipinitialspace=True
+            )
+            st.dataframe(df)
+        except:
+            st.text("결과를 표 형태로 표시할 수 없습니다.")
 
 
 if __name__ == "__main__":

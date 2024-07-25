@@ -1,8 +1,8 @@
 from langchain_openai import ChatOpenAI
 from langchain.prompts import ChatPromptTemplate
 from langchain.chains import LLMChain
-from config import MODEL_NAME, OPENAI_API_KEY
-from database import get_database
+from utils.config import MODEL_NAME, OPENAI_API_KEY
+from utils.database import get_database
 
 # LLM 초기화
 llm = ChatOpenAI(model=MODEL_NAME, temperature=0.7, api_key=OPENAI_API_KEY)

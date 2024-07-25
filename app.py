@@ -1,6 +1,10 @@
 import streamlit as st
 from sidebar import render_sidebar
 from main_content import render_main_content
+import sys
+import os
+
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 # 페이지 설정
 st.set_page_config(layout="wide", page_title="{}님의 대시보드")
